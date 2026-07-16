@@ -105,6 +105,56 @@
         font-size: 0.9rem;
         text-align: center;
     }
+    #soil-info {
+        width: 100%;
+        max-width: 400px;
+        margin-top: 20px;
+        background: #262640;
+        border: 1px solid #3a3a55;
+        border-radius: 10px;
+        padding: 16px 18px;
+        display: none;
+    }
+    #soil-info.visible {
+        display: block;
+    }
+    #soil-info h3 {
+        margin: 0 0 4px 0;
+        color: #a29bfe;
+        font-size: 1.1rem;
+    }
+    #soil-info p.soil-desc {
+        margin: 0 0 10px 0;
+        color: #c8c8dc;
+        font-size: 0.9rem;
+    }
+    #soil-info .crop-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #f0f0f0;
+        font-size: 0.95rem;
+    }
+    #soil-info .crop-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px 12px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    #soil-info .crop-list li {
+        background: #34345a;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.88rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    #soil-info .crop-list li::before {
+        content: "🌱";
+        font-size: 0.9rem;
+    }
 </style>
 </head>
 <body>
@@ -121,6 +171,14 @@
 <div id="webcam-container"></div>
 
 <div id="label-container"></div>
+
+<div id="soil-info">
+    <h3 id="soil-name"></h3>
+    <p class="soil-desc" id="soil-desc"></p>
+    <div class="crop-title">Recommended crops:</div>
+    <ul class="crop-list" id="crop-list"></ul>
+</div>
+
 <div id="status">Camera is off</div>
 
 <!-- TensorFlow.js and Teachable Machine libraries -->
@@ -130,6 +188,45 @@
 <script>
     // Link to your Teachable Machine model
     const URL = "https://teachablemachine.withgoogle.com/models/haqDXbbzJ/";
+
+    // Information about each soil type: description + recommended crops
+    // Add more soil types here as needed (key must match the model's class name)
+    const soilInfo = {
+        "Tanah Liat": {
+            description: "Tanah liat bertekstur padat, menyimpan air dan nutrien dengan baik, sesuai untuk tanaman berakar dalam.",
+            crops: ["Mangga", "Nangka", "Kangkung", "Keledek", "Halia"]
+        }
+    };
+
+    const soilInfoBox = document.getElementById("soil-info");
+    const soilNameEl = document.getElementById("soil-name");
+    const soilDescEl = document.getElementById("soil-desc");
+    const cropListEl = document.getElementById("crop-list");
+
+    // Find soil info by matching the predicted class name (case-insensitive)
+    function findSoilInfo(className) {
+        const key = Object.keys(soilInfo).find(
+            k => k.toLowerCase() === className.toLowerCase()
+        );
+        return key ? soilInfo[key] : null;
+    }
+
+    function showSoilInfo(className) {
+        const info = findSoilInfo(className);
+        if (!info) {
+            soilInfoBox.classList.remove("visible");
+            return;
+        }
+        soilNameEl.innerText = className;
+        soilDescEl.innerText = info.description;
+        cropListEl.innerHTML = "";
+        info.crops.forEach(crop => {
+            const li = document.createElement("li");
+            li.innerText = crop;
+            cropListEl.appendChild(li);
+        });
+        soilInfoBox.classList.add("visible");
+    }
 
     let model, webcam, labelContainer, maxPredictions;
     let currentFacingMode = "user"; // "user" = front camera, "environment" = back camera
@@ -210,6 +307,9 @@
     async function predict() {
         const prediction = await model.predict(webcam.canvas);
         const rows = labelContainer.getElementsByClassName("label-row");
+
+        let topPrediction = prediction[0];
+
         for (let i = 0; i < maxPredictions; i++) {
             const p = prediction[i];
             const percent = Math.round(p.probability * 100);
@@ -217,6 +317,17 @@
             row.querySelector(".label-name").innerText = p.className;
             row.querySelector(".label-percent").innerText = percent + "%";
             row.querySelector(".bar-fill").style.width = percent + "%";
+
+            if (p.probability > topPrediction.probability) {
+                topPrediction = p;
+            }
+        }
+
+        // Only show soil info when the model is reasonably confident
+        if (topPrediction.probability >= 0.6) {
+            showSoilInfo(topPrediction.className);
+        } else {
+            soilInfoBox.classList.remove("visible");
         }
     }
 
@@ -266,6 +377,7 @@
         }
         webcamContainer.innerHTML = "";
         if (labelContainer) labelContainer.innerHTML = "";
+        soilInfoBox.classList.remove("visible");
         statusEl.innerText = "Camera is off";
         startBtn.disabled = false;
         flipBtn.disabled = true;
