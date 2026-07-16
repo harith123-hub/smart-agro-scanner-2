@@ -9,8 +9,8 @@
         body { background: #1a2f1a; color: #fff; text-align: center; padding: 15px; }
         h1 { color: #8dd39e; margin-bottom: 15px; font-size: 24px; }
         .container { max-width: 700px; margin: 0 auto; }
-        #webcam-container { width: 100%; max-width: 640px; height: auto; border-radius: 12px; overflow: hidden; border: 3px solid #4a9f5a; margin: 15px auto; background: #222; }
-        video { width: 100%; height: auto; transform: scaleX(-1); }
+        #webcam-container { width: 100%; max-width: 640px; height: auto; border-radius: 12px; overflow: hidden; border: 3px solid #4a9f5a; margin: 15px auto; background: #222; min-height: 200px; display: flex; align-items: center; justify-content: center; }
+        video, canvas { width: 100%; height: auto; transform: scaleX(-1); object-fit: cover; }
         .controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 15px 0; }
         button { padding: 12px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         #startBtn { background: #4a9f5a; color: white; }
@@ -20,89 +20,98 @@
         #label-container { margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.4); border-radius: 10px; text-align: left; }
         .prediction { padding: 8px; margin: 5px 0; border-radius: 6px; background: rgba(74,159,90,0.2); }
         .confidence { float: right; font-weight: bold; color: #8dd39e; }
-        .note { margin-top: 20px; font-size: 14px; color: #bbb; }
+        .note { margin-top: 20px; font-size: 14px; color: #bbb; line-height: 1.5; }
+        .error { color: #ff6b6b; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🌱 Smart Agro Scanner</h1>
         <div id="webcam-container">
-            <p style="padding: 40px;">Click "Start Camera" to begin scanning</p>
+            <p style="padding: 20px;">Click "Start Camera" to begin scanning</p>
         </div>
         <div class="controls">
             <button id="startBtn" onclick="init()">Start Camera & Scan</button>
             <button id="switchBtn" onclick="switchCamera()" disabled>Switch Front/Back Camera</button>
         </div>
         <div id="label-container">Loading model...</div>
-        <p class="note">Works best in Chrome / Safari. Use rear camera for best plant/leaf scanning results.</p>
+        <p class="note">
+            ✅ Use <b>Chrome</b> or <b>Safari</b> only<br>
+            ✅ Allow camera permission when asked<br>
+            ✅ Must be opened via HTTPS or localhost<br>
+            ✅ Close other apps using camera first
+        </p>
     </div>
 
-    <!-- Load required libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
-        // === YOUR TEACHABLE MACHINE MODEL LINK ===
         const MODEL_URL = "https://teachablemachine.withgoogle.com/models/haqDXbbzJ/";
-        
-        let model, webcam, labelContainer, maxPredictions;
-        let currentFacingMode = "environment"; // Start with REAR camera
+        let model, webcam, maxPredictions;
+        let currentFacingMode = "environment";
         let isRunning = false;
 
-        // Initialize camera and model
         async function init() {
             try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Your browser does not support camera access. Please use Chrome or Safari.");
+                }
+
                 document.getElementById("startBtn").disabled = true;
                 document.getElementById("label-container").innerHTML = "🔄 Loading AI model...";
                 
-                // Load model files
                 const modelURL = MODEL_URL + "model.json";
                 const metadataURL = MODEL_URL + "metadata.json";
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
 
-                // Setup webcam with selected camera
                 await setupWebcam();
 
                 document.getElementById("switchBtn").disabled = false;
                 document.getElementById("label-container").innerHTML = "✅ Ready! Scanning...";
                 isRunning = true;
-                
-                // Start prediction loop
                 window.requestAnimationFrame(predict);
             } catch (error) {
                 console.error("Error:", error);
-                document.getElementById("label-container").innerHTML = "❌ Error: " + error.message + "<br>Allow camera access and use Chrome/Safari.";
+                document.getElementById("label-container").innerHTML = `<div class="error">❌ Error: ${error.message}<br>Check permission, use Chrome/Safari, and ensure HTTPS/localhost.</div>`;
                 document.getElementById("startBtn").disabled = false;
             }
         }
 
-        // Setup webcam feed
         async function setupWebcam() {
-            if (webcam) webcam.stop();
+            if (webcam) {
+                webcam.stop();
+                const container = document.getElementById("webcam-container");
+                container.innerHTML = "";
+            }
 
-            const flip = currentFacingMode === "user"; // Mirror only for front camera
-            webcam = new tmImage.Webcam(640, 480, flip, { facingMode: currentFacingMode });
+            const flip = currentFacingMode === "user";
+            webcam = new tmImage.Webcam(640, 480, flip, { 
+                facingMode: currentFacingMode,
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            });
+            
             await webcam.setup();
             await webcam.play();
-            document.getElementById("webcam-container").innerHTML = "";
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            const container = document.getElementById("webcam-container");
+            container.appendChild(webcam.canvas);
         }
 
-        // Switch between front and rear camera
         async function switchCamera() {
             if (!isRunning) return;
             currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
             await setupWebcam();
         }
 
-        // Run AI prediction on each frame
         async function predict() {
+            if (!webcam || !model) return;
             const prediction = await model.predict(webcam.canvas);
-            labelContainer = document.getElementById("label-container");
+            const labelContainer = document.getElementById("label-container");
             labelContainer.innerHTML = "<h3>📊 Scanning Results:</h3>";
 
-            // Sort results by confidence
             prediction.sort((a, b) => b.probability - a.probability);
 
             for (let i = 0; i < maxPredictions; i++) {
