@@ -1,133 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Agro Scanner</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
-        body { background: #1a2f1a; color: #fff; text-align: center; padding: 15px; }
-        h1 { color: #8dd39e; margin-bottom: 15px; font-size: 24px; }
-        .container { max-width: 700px; margin: 0 auto; }
-        #webcam-container { width: 100%; max-width: 640px; height: auto; border-radius: 12px; overflow: hidden; border: 3px solid #4a9f5a; margin: 15px auto; background: #222; min-height: 200px; display: flex; align-items: center; justify-content: center; }
-        video, canvas { width: 100%; height: auto; transform: scaleX(-1); object-fit: cover; }
-        .controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 15px 0; }
-        button { padding: 12px 20px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        #startBtn { background: #4a9f5a; color: white; }
-        #switchBtn { background: #2980b9; color: white; }
-        button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
-        button:hover:not(:disabled) { transform: translateY(-2px); }
-        #label-container { margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.4); border-radius: 10px; text-align: left; }
-        .prediction { padding: 8px; margin: 5px 0; border-radius: 6px; background: rgba(74,159,90,0.2); }
-        .confidence { float: right; font-weight: bold; color: #8dd39e; }
-        .note { margin-top: 20px; font-size: 14px; color: #bbb; line-height: 1.5; }
-        .error { color: #ff6b6b; margin-top: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teachable Machine - Camera Classifier</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        background: #1e1e2f;
+        color: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 30px 15px;
+        margin: 0;
+        min-height: 100vh;
+    }
+    h1 {
+        margin-bottom: 5px;
+        font-size: 1.6rem;
+        text-align: center;
+    }
+    p.subtitle {
+        color: #a0a0b8;
+        margin-top: 0;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    #webcam-container {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        background: #000;
+        min-height: 200px;
+        min-width: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #webcam-container canvas {
+        display: block;
+    }
+    .controls {
+        display: flex;
+        gap: 12px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    button {
+        background: #6c5ce7;
+        color: white;
+        border: none;
+        padding: 12px 22px;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+    }
+    button:hover {
+        background: #5a4bd1;
+    }
+    button:active {
+        transform: scale(0.97);
+    }
+    button:disabled {
+        background: #444;
+        cursor: not-allowed;
+    }
+    #label-container {
+        width: 100%;
+        max-width: 400px;
+        margin-top: 10px;
+    }
+    .label-row {
+        display: flex;
+        justify-content: space-between;
+        background: #2a2a40;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+    .label-row .bar-bg {
+        flex: 1;
+        background: #3a3a55;
+        border-radius: 6px;
+        margin: 0 10px;
+        overflow: hidden;
+        height: 10px;
+        align-self: center;
+    }
+    .label-row .bar-fill {
+        height: 100%;
+        background: #6c5ce7;
+    }
+    #status {
+        margin-top: 15px;
+        color: #a0a0b8;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>🌱 Smart Agro Scanner</h1>
-        <div id="webcam-container">
-            <p style="padding: 20px;">Click "Start Camera" to begin scanning</p>
-        </div>
-        <div class="controls">
-            <button id="startBtn" onclick="init()">Start Camera & Scan</button>
-            <button id="switchBtn" onclick="switchCamera()" disabled>Switch Front/Back Camera</button>
-        </div>
-        <div id="label-container">Loading model...</div>
-        <p class="note">
-            ✅ Use <b>Chrome</b> or <b>Safari</b> only<br>
-            ✅ Allow camera permission when asked<br>
-            ✅ Must be opened via HTTPS or localhost<br>
-            ✅ Close other apps using camera first
-        </p>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<h1>Teachable Machine Camera Classifier</h1>
+<p class="subtitle">Start the camera, point it at something, and see the live predictions below.</p>
 
-    <script type="text/javascript">
-        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/haqDXbbzJ/";
-        let model, webcam, maxPredictions;
-        let currentFacingMode = "environment";
-        let isRunning = false;
+<div class="controls">
+    <button id="start-btn">Start Camera</button>
+    <button id="flip-btn" disabled>Flip Camera</button>
+    <button id="stop-btn" disabled>Stop Camera</button>
+</div>
 
-        async function init() {
-            try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("Your browser does not support camera access. Please use Chrome or Safari.");
-                }
+<div id="webcam-container"></div>
 
-                document.getElementById("startBtn").disabled = true;
-                document.getElementById("label-container").innerHTML = "🔄 Loading AI model...";
-                
-                const modelURL = MODEL_URL + "model.json";
-                const metadataURL = MODEL_URL + "metadata.json";
-                model = await tmImage.load(modelURL, metadataURL);
-                maxPredictions = model.getTotalClasses();
+<div id="label-container"></div>
+<div id="status">Camera is off</div>
 
-                await setupWebcam();
+<!-- TensorFlow.js and Teachable Machine libraries -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 
-                document.getElementById("switchBtn").disabled = false;
-                document.getElementById("label-container").innerHTML = "✅ Ready! Scanning...";
-                isRunning = true;
-                window.requestAnimationFrame(predict);
-            } catch (error) {
-                console.error("Error:", error);
-                document.getElementById("label-container").innerHTML = `<div class="error">❌ Error: ${error.message}<br>Check permission, use Chrome/Safari, and ensure HTTPS/localhost.</div>`;
-                document.getElementById("startBtn").disabled = false;
-            }
-        }
+<script>
+    // Link to your Teachable Machine model
+    const URL = "https://teachablemachine.withgoogle.com/models/haqDXbbzJ/";
 
-        async function setupWebcam() {
-            if (webcam) {
-                webcam.stop();
-                const container = document.getElementById("webcam-container");
-                container.innerHTML = "";
-            }
+    let model, webcam, labelContainer, maxPredictions;
+    let currentFacingMode = "user"; // "user" = front camera, "environment" = back camera
+    let isRunning = false;
+    let animationId;
 
-            const flip = currentFacingMode === "user";
-            webcam = new tmImage.Webcam(640, 480, flip, { 
-                facingMode: currentFacingMode,
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            });
-            
-            await webcam.setup();
+    const startBtn = document.getElementById("start-btn");
+    const flipBtn = document.getElementById("flip-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const statusEl = document.getElementById("status");
+    const webcamContainer = document.getElementById("webcam-container");
+
+    startBtn.addEventListener("click", () => init());
+    flipBtn.addEventListener("click", () => flipCamera());
+    stopBtn.addEventListener("click", () => stopCamera());
+
+    // Load the model once, reuse it every time
+    async function loadModel() {
+        if (model) return;
+        statusEl.innerText = "Loading model...";
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+    }
+
+    async function init() {
+        try {
+            startBtn.disabled = true;
+            statusEl.innerText = "Requesting camera access...";
+
+            await loadModel();
+
+            const flip = true; // mirror the front camera
+            const width = 400;
+            const height = 400;
+
+            webcam = new tmImage.Webcam(width, height, flip);
+            await webcam.setup({ facingMode: currentFacingMode });
             await webcam.play();
-            
-            const container = document.getElementById("webcam-container");
-            container.appendChild(webcam.canvas);
-        }
 
-        async function switchCamera() {
-            if (!isRunning) return;
-            currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
-            await setupWebcam();
-        }
+            isRunning = true;
+            animationId = window.requestAnimationFrame(loop);
 
-        async function predict() {
-            if (!webcam || !model) return;
-            const prediction = await model.predict(webcam.canvas);
-            const labelContainer = document.getElementById("label-container");
-            labelContainer.innerHTML = "<h3>📊 Scanning Results:</h3>";
+            webcamContainer.innerHTML = "";
+            webcamContainer.appendChild(webcam.canvas);
 
-            prediction.sort((a, b) => b.probability - a.probability);
-
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
             for (let i = 0; i < maxPredictions; i++) {
-                const className = prediction[i].className || "Unknown";
-                const probability = (prediction[i].probability * 100).toFixed(1);
-                
-                labelContainer.innerHTML += `
-                    <div class="prediction">
-                        ${className}
-                        <span class="confidence">${probability}%</span>
-                    </div>
+                const row = document.createElement("div");
+                row.className = "label-row";
+                row.innerHTML = `
+                    <span class="label-name">-</span>
+                    <div class="bar-bg"><div class="bar-fill" style="width:0%"></div></div>
+                    <span class="label-percent">0%</span>
                 `;
+                labelContainer.appendChild(row);
             }
 
-            window.requestAnimationFrame(predict);
+            flipBtn.disabled = false;
+            stopBtn.disabled = false;
+            statusEl.innerText = "Camera running (" + (currentFacingMode === "user" ? "Front" : "Back") + " camera)";
+        } catch (err) {
+            console.error(err);
+            statusEl.innerText = "Could not access camera: " + err.message;
+            startBtn.disabled = false;
         }
-    </script>
+    }
+
+    async function loop() {
+        if (!isRunning) return;
+        webcam.update();
+        await predict();
+        animationId = window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        const rows = labelContainer.getElementsByClassName("label-row");
+        for (let i = 0; i < maxPredictions; i++) {
+            const p = prediction[i];
+            const percent = Math.round(p.probability * 100);
+            const row = rows[i];
+            row.querySelector(".label-name").innerText = p.className;
+            row.querySelector(".label-percent").innerText = percent + "%";
+            row.querySelector(".bar-fill").style.width = percent + "%";
+        }
+    }
+
+    async function flipCamera() {
+        flipBtn.disabled = true;
+        statusEl.innerText = "Switching camera...";
+
+        // stop current webcam stream
+        if (webcam) {
+            webcam.stop();
+        }
+        isRunning = false;
+        if (animationId) cancelAnimationFrame(animationId);
+
+        // toggle facing mode
+        currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+
+        try {
+            const flip = currentFacingMode === "user"; // mirror only front camera
+            const width = 400;
+            const height = 400;
+
+            webcam = new tmImage.Webcam(width, height, flip);
+            await webcam.setup({ facingMode: currentFacingMode });
+            await webcam.play();
+
+            webcamContainer.innerHTML = "";
+            webcamContainer.appendChild(webcam.canvas);
+
+            isRunning = true;
+            animationId = window.requestAnimationFrame(loop);
+
+            statusEl.innerText = "Camera running (" + (currentFacingMode === "user" ? "Front" : "Back") + " camera)";
+        } catch (err) {
+            console.error(err);
+            statusEl.innerText = "Could not switch camera: " + err.message;
+        } finally {
+            flipBtn.disabled = false;
+        }
+    }
+
+    function stopCamera() {
+        isRunning = false;
+        if (animationId) cancelAnimationFrame(animationId);
+        if (webcam) {
+            webcam.stop();
+        }
+        webcamContainer.innerHTML = "";
+        if (labelContainer) labelContainer.innerHTML = "";
+        statusEl.innerText = "Camera is off";
+        startBtn.disabled = false;
+        flipBtn.disabled = true;
+        stopBtn.disabled = true;
+    }
+</script>
+
 </body>
 </html>
