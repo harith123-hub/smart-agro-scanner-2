@@ -1,120 +1,124 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Scan Agro</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Scan Agro</title>
 
-    <!-- TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<!-- TensorFlow -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
 
-    <!-- Teachable Machine -->
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<!-- Teachable Machine -->
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f4f9f4;
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
+<style>
+    body{
+        margin:0;
+        font-family:Arial, Helvetica, sans-serif;
+        background:#eef8ee;
+        text-align:center;
+    }
 
-        header {
-            background: #2E7D32;
-            color: white;
-            padding: 20px;
-            font-size: 32px;
-            font-weight: bold;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
+    header{
+        background:#2E7D32;
+        color:white;
+        padding:20px;
+        font-size:32px;
+        font-weight:bold;
+    }
 
-        .container {
-            margin-top: 30px;
-        }
+    .container{
+        margin-top:25px;
+    }
 
-        button {
-            background: #43A047;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            font-size: 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
+    button{
+        background:#2E7D32;
+        color:white;
+        border:none;
+        padding:12px 22px;
+        margin:8px;
+        font-size:16px;
+        border-radius:8px;
+        cursor:pointer;
+    }
 
-        button:hover {
-            background: #2E7D32;
-        }
+    button:hover{
+        background:#1B5E20;
+    }
 
-        #webcam-container {
-            margin-top: 20px;
-        }
+    #webcam-container{
+        margin-top:20px;
+    }
 
-        canvas {
-            border: 5px solid #2E7D32;
-            border-radius: 10px;
-        }
+    canvas{
+        border:4px solid #2E7D32;
+        border-radius:10px;
+    }
 
-        #label-container {
-            margin-top: 20px;
-            width: 320px;
-            margin-left: auto;
-            margin-right: auto;
-            text-align: left;
-            font-size: 18px;
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0px 2px 8px rgba(0,0,0,0.2);
-        }
+    #label-container{
+        width:330px;
+        margin:20px auto;
+        background:white;
+        padding:15px;
+        border-radius:10px;
+        box-shadow:0 0 10px rgba(0,0,0,0.2);
+        text-align:left;
+    }
 
-        #label-container div {
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-        }
+    #label-container div{
+        padding:8px;
+        border-bottom:1px solid #ddd;
+    }
 
-        footer {
-            margin-top: 30px;
-            padding: 15px;
-            background: #2E7D32;
-            color: white;
-        }
-    </style>
+    footer{
+        margin-top:30px;
+        background:#2E7D32;
+        color:white;
+        padding:15px;
+    }
+</style>
+
 </head>
 
 <body>
 
 <header>
-    🌱 Smart Scan Agro
+🌱 Smart Scan Agro
 </header>
 
 <div class="container">
 
-    <h2>Sistem Pengesanan Tanaman Menggunakan AI</h2>
+<h2>AI Plant Detection System</h2>
 
-    <p>Tekan butang di bawah untuk mengaktifkan kamera.</p>
+<p>Press the button below to start the camera.</p>
 
-    <button onclick="init()">📷 Mulakan Kamera</button>
+<button onclick="init()">📷 Start Camera</button>
 
-    <div id="webcam-container"></div>
+<button onclick="flipCamera()">🔄 Flip Camera</button>
 
-    <div id="label-container"></div>
+<div id="webcam-container"></div>
+
+<div id="label-container"></div>
 
 </div>
 
 <footer>
-    Smart Scan Agro © 2026
+Smart Scan Agro © 2026
 </footer>
 
 <script>
 
 const URL = "https://teachablemachine.withgoogle.com/models/haqDXbbzJ/";
 
-let model, webcam, labelContainer, maxPredictions;
+let model;
+let webcam;
+let labelContainer;
+let maxPredictions;
 
-async function init() {
+let flip = true;
+
+// Start Camera
+async function init(){
 
     const modelURL = URL + "model.json";
     const metadataURL = URL + "metadata.json";
@@ -123,7 +127,7 @@ async function init() {
 
     maxPredictions = model.getTotalClasses();
 
-    webcam = new tmImage.Webcam(320, 320, true);
+    webcam = new tmImage.Webcam(320,320,flip);
 
     await webcam.setup();
 
@@ -131,20 +135,22 @@ async function init() {
 
     window.requestAnimationFrame(loop);
 
-    document.getElementById("webcam-container").innerHTML = "";
+    document.getElementById("webcam-container").innerHTML="";
 
     document.getElementById("webcam-container").appendChild(webcam.canvas);
 
     labelContainer = document.getElementById("label-container");
 
-    labelContainer.innerHTML = "";
+    labelContainer.innerHTML="";
 
-    for (let i = 0; i < maxPredictions; i++) {
+    for(let i=0;i<maxPredictions;i++){
         labelContainer.appendChild(document.createElement("div"));
     }
+
 }
 
-async function loop() {
+// Loop
+async function loop(){
 
     webcam.update();
 
@@ -154,19 +160,41 @@ async function loop() {
 
 }
 
-async function predict() {
+// Prediction
+async function predict(){
 
     const prediction = await model.predict(webcam.canvas);
 
-    for (let i = 0; i < maxPredictions; i++) {
+    for(let i=0;i<maxPredictions;i++){
 
-        const probability = (prediction[i].probability * 100).toFixed(2);
+        const probability = (prediction[i].probability*100).toFixed(2);
 
         labelContainer.childNodes[i].innerHTML =
-            "<b>" + prediction[i].className + "</b> : " +
-            probability + "%";
+        "<b>"+prediction[i].className+
+        "</b> : "+probability+" %";
 
     }
+
+}
+
+// Flip Camera
+async function flipCamera(){
+
+    if(!webcam) return;
+
+    await webcam.stop();
+
+    flip = !flip;
+
+    webcam = new tmImage.Webcam(320,320,flip);
+
+    await webcam.setup();
+
+    await webcam.play();
+
+    document.getElementById("webcam-container").innerHTML="";
+
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
 
 }
 
